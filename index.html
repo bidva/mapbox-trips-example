@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset=utf-8 />
+  <title>Courier</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+  <script src="https://www.mapbox.com/bites/00115/jquery.min.js"></script>
+  <script src='https://api.mapbox.com/mapbox.js/v3.1.1/mapbox.js'></script>
+  <link href='https://api.mapbox.com/mapbox.js/v3.1.1/mapbox.css' rel='stylesheet' />
+  <script src='https://api.tiles.mapbox.com/mapbox.js/plugins/turf/v2.0.0/turf.min.js'></script>
+  <link href='https://www.mapbox.com/base/latest/base.css' rel='stylesheet' />
+  <link href='style.css' rel='stylesheet' />
+</head>
+
+<body>
+  <div id='map'></div>
+  <div id='sidebar' class='fill-navy-dark'>
+    <div class='clearfix'>
+      <div class='col6'>
+        <div class='metriclabel small quiet space-top4 space-bottom4'>Packages <br>retrieved</div>
+        <div class='metric retrieved denim'>0</div>
+      </div>
+      <div class='col6'>
+        <div class='metriclabel small quiet space-top4 space-bottom4'>Awaiting <br>pickup</div>
+        <div class='metric queue'>0</div>
+      </div>
+    </div>
+    <div class='metriclabel small quiet space-bottom4' style='padding-top:40px'>Average response time</div>
+    <div class='metric responsetime space-bottom4'>-</div>
+    <div class='dark small text-left pad2 space-top7 blurb hidden'>
+      <p> This simulation models a courier service that picks up packages throughout the city, and offloads them at three designated dropoff points (marked with flags).
+      </p>
+      <p>
+        A simple scheduling algorithm guides five bike couriers to the <strong>oldest</strong> and <strong>nearest</strong> orders to their respective locations. After the 5th pickup, each courier will route to the nearest dropoff point to offload, and
+        the process repeats.
+      </p>
+
+      <p class='strong'> Click anywhere on the map to add a pickup order at that location.</p>
+    </div>
+    <div class='metriclabel small quiet space-top4 space-bottom2'>Events</div>
+    <div class='ticker dark small text-left'>
+    </div>
+  </div>
+  <script>
+    Array.minIndex = function(array) {
+      return array.indexOf(Math.min.apply(Math, array));
+    };
+    L.mapbox.accessToken = 'pk.eyJ1IjoicGV0ZXJxbGl1IiwiYSI6ImpvZmV0UEEifQ._D4bRmVcGfJvo1wjuOpA1g';
+    function reverseCoords(pair) {
+      return [pair[1], pair[0]]
+    }
+    var receivedQuantity = 0;
+    var responseNumerator = 0;
+    //interval at which animation progresses, in milliseconds per frame
+    var pollingInterval = 250;
+    var pickupPoints = {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "64 Delancey St",
+            "time_submitted": 1428941074549
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.990533,
+              40.719515
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "508 E 6th St",
+            "time_submitted": 1428941076676
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.983455,
+              40.725007
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "245 E 31st St",
+            "time_submitted": 1428941078865
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.977721,
+              40.743244
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "118 E 31st St",
+            "time_submitted": 1428941079891
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.981918,
+              40.744587
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "61 W 9th St",
+            "time_submitted": 1428941080424
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.998362,
+              40.73411
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "30 Vandam St",
+            "time_submitted": 1428941081584
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-74.004983,
+              40.726134
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "94 Avenue A",
+            "time_submitted": 1428941082591
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.983624,
+              40.725472
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "653 E 5th St",
+            "time_submitted": 1428941084832
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.979907,
+              40.723082
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "97 Charles St",
+            "time_submitted": 1428941085634
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-74.005377,
+              40.734899
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "357 Grand St",
+            "time_submitted": 1428941086852
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.987387,
+              40.715673
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "81 Bleecker St",
+            "time_submitted": 1428941087632
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.996342,
+              40.726976
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "marker-color": "#666",
+            "marker-size": "small",
+            "marker-symbol": "circle",
+            "address": "50 2nd Ave",
+            "time_submitted": 1428941088728
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [-73.989756,
+              40.725359
+            ]
+          }
+        }
+      ]
+    };
+    function updateTicker(content) {
+      $('.ticker')
+        .prepend(content)
+
+      window.setTimeout(function() {
+        $('.ticker div').addClass('expanded')
+      }, 50);
+    }
+    var colors = [
+      ['Blue', '456E75'],
+      ['Green', '8F9957'],
+      ['Orange', 'B87C51'],
+      ['Red', 'B04548'],
+      ['Purple', '5C2E58'],
+      ['LightCoral', 'F08080'],
+      ['GreenYellow', 'ADFF2F'],
+      ['Magenta', 'FF00FF'],
+      ['BurlyWood', 'DEB887'],
+      ['LightBlue', 'ADD8E6'],
+      ['MediumTurquoise', '48D1CC']
+    ];
+    $.get('addresses.json', function(error, response, data) {
+      var addresses = data.responseJSON;
+      //generate new pickups at regular interval
+      function setPoint(){
+        var randomIndex = parseInt(Math.random() * addresses.length);
+        var queryURL = 'https://api.tiles.mapbox.com/v4/geocode/mapbox.places/' + addresses[randomIndex][1] + '.json?access_token=' + L.mapbox.accessToken;
+
+        $.get(queryURL, function(data) {
+          pickupPoints.features.push({
+            "type": "Feature",
+            "properties": {
+              "marker-color": "#666",
+              "marker-size": "small",
+              "marker-symbol": "circle",
+              "address": addresses[randomIndex][0],
+              "time_submitted": Date.now()
+            },
+            "geometry": {
+              "type": "Point",
+              "coordinates": data.features[0]['center']
+            }
+          })
+
+          updateTicker('<div><strong class="incoming strongpad">★ New order</strong>  <strong>' + addresses[randomIndex][0] + '</strong> added to queue.')
+          updatePickups();
+        })
+      }
+      var duration = 750;
+      var newPackage = setInterval(function() {
+        setPoint();
+      }, duration);
+      pickupPoints.features.forEach(function(n) {
+        n.properties.time_submitted = Date.now()
+      })
+      var map = L.mapbox.map('map', 'mapbox.dark')
+        .setView([40.74, -73.9921], 14);
+      map.scrollWheelZoom.disable();
+      var pickups = L.mapbox.featureLayer().addTo(map);
+      //update pickup markers and count
+      function updatePickups() {
+        pickups.setGeoJSON(pickupPoints);
+        $('.queue').text(pickupPoints.features.length)
+      }
+      //convert decimal minutes into minutes:seconds
+      function timeConverter(decimal) {
+        var min = Math.floor(Math.abs(decimal))
+        var sec = Math.floor((Math.abs(decimal) * 60) % 60);
+        return min + ":" + (sec < 10 ? "0" : "") + sec;
+      }
+      function createCourier(color) {
+        var courierPayload = 0
+        //courier icon
+        var courierIcon = L.divIcon({
+          className: 'couriericon ' + color[0],
+          iconSize: [15, 15],
+          html: ''
+        });
+        var randomStartIndex = parseInt(Math.random() * addresses.length);
+        var queryStartURL = 'https://api.tiles.mapbox.com/v4/geocode/mapbox.places/' + addresses[randomStartIndex][1] + '.json?access_token=' + L.mapbox.accessToken;
+        $.get(queryStartURL, function(data) {
+          //init driver position
+          let initPoint = data.features[0]['center'];
+          //draw courier
+          var courier = L.marker(reverseCoords(initPoint), {
+            icon: courierIcon
+          }).addTo(map);
+          var courierTarget = L.marker([0, 0], {
+            icon: L.divIcon({
+              className: 'couriertarget ' + color[0],
+              iconSize: [20, 50],
+              html: '<img class="couriertarget" src="https://a.tiles.mapbox.com/v4/marker/pin-s-circle+' + color[1] + '.png?access_token=pk.eyJ1IjoicGV0ZXJxbGl1IiwiYSI6ImpvZmV0UEEifQ._D4bRmVcGfJvo1wjuOpA1g">'
+            })
+          }).addTo(map);
+          function goToPickup(currentLocation) {
+            //distance of each pickup, divided by time elapsed
+            var adjustedScores = pickupPoints.features.map(function(n) {
+              return (
+                Math.pow(turf.distance(currentLocation, n, 'miles'), 2) / (Date.now() - parseFloat(n.properties['time_submitted'])))
+            });
+            //identify nearest pickup to the courier, and remove it from the overall list
+            var nearestPickupIndex = Array.minIndex(adjustedScores);
+            var nearestPickup = pickupPoints.features[nearestPickupIndex];
+            //clean pickupPoints because it reach to that point;
+            pickupPoints.features.splice(nearestPickupIndex, 1);
+            updatePickups();
+            //assemble URL to route from courier's current location to the pickup
+            var endpoints = currentLocation.geometry.coordinates + ';' + nearestPickup.geometry.coordinates;
+            var directionsURL = 'https://api.tiles.mapbox.com/v4/directions/mapbox.cycling/' + endpoints + '.json?access_token=' + L.mapbox.accessToken;
+            courierTarget.setLatLng(L.latLng(nearestPickup.geometry.coordinates[1], nearestPickup.geometry.coordinates[0]))
+            //query directions
+            $.get(directionsURL, function(data, err) {
+
+              var coords = data.routes[0].geometry.coordinates;
+              var processedCoords = coords.map(function(n) {
+                return reverseCoords(n)
+              });
+              var path = turf.linestring(coords);
+              $('.' + color[0] + 'path').remove();
+              var courierRoute =
+                L.polyline(processedCoords, {
+                  color: "#" + color[1],
+                  className: color[0] + 'path'
+                })
+                .addTo(map);
+
+
+              //animate route path
+              window.setTimeout(function() {
+                $('path').css('stroke-dashoffset', 0)
+              }, 400);
+              var tripDuration = (data.routes[0].duration / 60).toFixed(0); //duration in minutes
+              var tripDistance = data.routes[0].distance; //distance in meters
+              var increment = 0;
+
+              if (currentLocation.properties.address) {
+                updateTicker('<div><strong class="strongpad" style="background:#' + color[1] + '"">✓ Pickup</strong> ' + color[0] + ' has arrived at <strong>' + currentLocation.properties.address + '</strong>. Now headed to <strong>' +
+                  nearestPickup.properties.address + '</strong> (' + tripDuration + ' min, ' + (tripDistance / 1609).toFixed(2) + ' mi)')
+              }
+
+              var bikingAnimation = setInterval(function() {
+                //once the animation is complete, kill animation and fire this function recursively, starting at the current location
+                if (increment > tripDuration * 1000 / pollingInterval) {
+                  courierPayload++
+                  receivedQuantity++
+                  responseNumerator += (Date.now() - nearestPickup.properties['time_submitted'])
+                  $('.retrieved').text(receivedQuantity);
+                  $('.responsetime').text(timeConverter(responseNumerator / (receivedQuantity * 1000)));
+                  $('.couriericon.' + color[0]).text(courierPayload);
+                  clearInterval(bikingAnimation);
+                  //depending on payload, go to next pickup, or drop off
+                  goToPickup(nearestPickup)
+                }
+                //1 SECOND= 60 REAL SECONDS. if the animation is not complete, calculate waypoint for animation and transition there (CSS)
+                increment++;
+                var waypoint =
+                  turf.along(path, increment * tripDistance * pollingInterval / (tripDuration * 1000 * 1000), 'kilometers').geometry.coordinates;
+                courier.setLatLng(L.latLng(waypoint[1], waypoint[0]))
+              }, pollingInterval);
+            })
+          }
+          goToPickup(data.features[0]);
+        })
+      }
+      //create couriers
+      colors.forEach(function(n) {
+        createCourier(n)
+      })
+    })
+  </script>
+</body>
+
+</html>
